@@ -1,0 +1,91 @@
+﻿<Window x:Class="LedController.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:LedController"
+		xmlns:xctk="http://schemas.xceed.com/wpf/xaml/toolkit"
+        mc:Ignorable="d"		
+        Title="MainWindow" Height="350" Width="525" Closing="Window_Closing">
+	<Grid>
+		<Grid.ColumnDefinitions>
+			<ColumnDefinition></ColumnDefinition>
+		</Grid.ColumnDefinitions>
+		<Grid.RowDefinitions>
+			<RowDefinition Height="*"></RowDefinition>
+			<RowDefinition Height="30"></RowDefinition>
+		</Grid.RowDefinitions>
+		<StatusBar Grid.Row="1" VerticalAlignment="Stretch" >
+			<StatusBar.ItemsPanel>
+				<ItemsPanelTemplate>
+					<Grid>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="Auto" />
+							<ColumnDefinition Width="Auto" />
+							<ColumnDefinition Width="*" />
+							<ColumnDefinition Width="auto" />
+							<ColumnDefinition Width="auto" />
+							<ColumnDefinition Width="auto" />
+							<ColumnDefinition Width="auto" />
+						</Grid.ColumnDefinitions>
+					</Grid>
+				</ItemsPanelTemplate>
+			</StatusBar.ItemsPanel>
+			<StatusBarItem Grid.Column="0" Background="Transparent">
+				<Image Margin="0,0">
+					<Image.Style>
+						<Style TargetType="{x:Type Image}">
+							<Style.Triggers>
+								<DataTrigger Binding="{Binding Path=isConnected, Mode=OneWay, FallbackValue=false}" Value="false">
+									<Setter Property="Source" Value="Resources/Disconnected-50.png"/>
+								</DataTrigger>
+								<DataTrigger Binding="{Binding Path=isConnected, Mode=OneWay, FallbackValue=false}" Value="true">
+									<Setter Property="Source" Value="Resources/Connected-50.png"/>
+								</DataTrigger>
+							</Style.Triggers>
+						</Style>
+					</Image.Style>
+				</Image>
+			</StatusBarItem>
+			<StatusBarItem Grid.Column="1" Background="Transparent" BorderThickness="1,0,0,0"  BorderBrush="Gray">
+				<DockPanel>
+					<TextBlock Text = "Debug: "/>
+					<!--<TextBlock Text = "{Binding FlowState, ElementName=_this, FallbackValue=0, Mode=OneWay}"/>-->
+				</DockPanel>
+			</StatusBarItem>
+			<StatusBarItem Grid.Column="3" Background="Transparent" BorderThickness="1,0,1,0" BorderBrush="Gray" >
+				<TextBlock Text="{Binding serialNumber, Mode=OneWay, FallbackValue=0, StringFormat=SN: \{0\}}"/>
+			</StatusBarItem>
+			<StatusBarItem Grid.Column="4" Background="Transparent" BorderThickness="0,0,1,0" BorderBrush="Gray">
+				<TextBlock Text="{Binding totalBytesSent, Mode=OneWay, FallbackValue=0, StringFormat=Sent: \{0\}}"/>
+			</StatusBarItem>
+			<StatusBarItem Grid.Column="5" Background="Transparent" BorderThickness="0,0,1,0" BorderBrush="Gray" >
+				<TextBlock Text="{Binding totalBytesRecv, Mode=OneWay, FallbackValue=0, StringFormat=Recv: \{0\}}"/>
+			</StatusBarItem>
+			<StatusBarItem  Grid.Column="6" Background="Transparent" BorderThickness="0,0,1,0" BorderBrush="Gray" >
+				<!--<TextBlock x:Name="SysTime" Text="Date/Time:"/>-->
+			</StatusBarItem>
+
+		</StatusBar>
+		<Canvas HorizontalAlignment="Left" Height="292" Grid.Row="0" VerticalAlignment="Top" Width="518">
+			<Button x:Name="btnAllOff" Content="All Off" Canvas.Left="5" Width="75" Click="allOffBtn_Click" Canvas.Top="260"/>
+			<Button x:Name="btnRandomSeed" Content="Rand Seed" Width="75" Click="btnRandomSeed_Click" Canvas.Top="206" Canvas.Left="5"/>
+			<xctk:ColorPicker x:Name="colorSelector" Height="30" Width="105" DisplayColorAndName="False" ColorMode="ColorCanvas" AdvancedButtonHeader="Canvas" IsManipulationEnabled="False" MaxDropDownWidth="240" SelectedColor="Black" ShowAvailableColors="False" ShowStandardColors="False" ShowTabHeaders="False" UsingAlphaChannel="False" Canvas.Left="85" />
+			<xctk:DoubleUpDown x:Name="numLedId" Height="30" Width="59" FormatString="F0" Value="0"  Maximum="1000" Minimum="0" Canvas.Left="85" Text="0" Canvas.Top="35"/>
+			<Button x:Name="btnRotateCcw" Content="Rotate CCW" Canvas.Left="5" Width="75" Canvas.Top="111" Click="btnRotateCcw_Click"/>
+			<Button x:Name="btnRotateCw" Content="Rotate CW" Click="btnRotateCw_Click" Height="22" Canvas.Left="5" Canvas.Top="146" Width="75"/>
+			<Button x:Name="btnSetStrip" Content="Set Strip" Canvas.Left="5" Width="75" Click="btnSetStrip_Click" Canvas.Top="4"/>
+			<Button x:Name="btnSetLed" Content="Set LED" Canvas.Left="5" Width="75" Click="btnSetLed_Click" Canvas.Top="40"/>
+			<Button x:Name="btnSwapLed" Content="Swap LED" Canvas.Left="5" Width="75" Canvas.Top="75" Click="btnSwapLed_Click"/>
+			<xctk:DoubleUpDown x:Name="numSwapLed1" Height="30" Width="59" FormatString="F0" Value="0"  Maximum="1000" Minimum="0" Canvas.Left="85" Text="0" Canvas.Top="70"/>
+			<xctk:DoubleUpDown x:Name="numSwapLed2" Height="30" Width="59" FormatString="F0" Value="0"  Maximum="1000" Minimum="0" Canvas.Left="149" Text="0" Canvas.Top="71"/>
+			<Button x:Name="btnStreamEffect" Content="Stream Effect" Height="22" Canvas.Left="416" Canvas.Top="10" Width="92" Click="btnRotateLoop_Click"/>
+			<Button x:Name="btnChaseEffect" Content="Chase Effect" Height="22" Canvas.Left="416" Canvas.Top="40" Width="92" Click="btnRotateLoop_Click"/>
+			<xctk:DoubleUpDown x:Name="numRotate" Height="30" Width="59" FormatString="F0" Value="1"  Maximum="1000" Minimum="1" Canvas.Left="85" Text="0" Canvas.Top="126"/>
+			<Button x:Name="btnFadeEffect" Content="Fade Effect" Height="22" Canvas.Left="416" Canvas.Top="71" Width="92" Click="btnRotateLoop_Click" IsEnabled="False"/>
+			<Button x:Name="btnRandomOff" Content="Rand Off" Canvas.Left="5" Width="75" Click="btnRandomOff_Click" Canvas.Top="233"/>
+			<Button x:Name="btnDestructEffect" Content="Destruct Effect" Height="22" Canvas.Left="416" Canvas.Top="104" Width="92" Click="btnRotateLoop_Click"/>
+		</Canvas>
+
+	</Grid>
+</Window>
