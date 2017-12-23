@@ -23,7 +23,7 @@ namespace LedController
         private string deviceComPort = null;  //COM1, COM2, COM3 etc...
         public Color[] ledStripState;  //keeps track of the state of each LED on the stirp
 
-        public int totalLedsOnTheStrip { get; private set; }
+        public ushort totalLedsOnTheStrip { get; private set; }
 
         private string _serialNumber = string.Empty;
         public string serialNumber
@@ -107,17 +107,18 @@ namespace LedController
             cmdStripInit,         //initialize the strip to the count of LEDs.
             cmdStripOff,          //turn off entire strip
             cmdStripSetColor,     //set all LEDs in the strip to a specific color
-            cmdStripFadeIn,       //not implemented increments each LED on the strip's G, R and B value the supplied value
-            cmdStripFadeOut,      //not implemented decrements each LED on the strip's G, R and B value the supplied value
-            cmdStripRotateClockwise,      //shift all LEDs in the strip in the positive direction by a specific number of LEDs.
-            cmdStripRotateCounterClockwise,
+            cmdStripIncColor,       //not implemented increments each LED on the strip's G, R and B value the supplied value
+            cmdStripDecColor,      //not implemented decrements each LED on the strip's G, R and B value the supplied value
+            cmdStripRotate,         //shift all LEDs in the strip in the specified direction by a specific number.
+            cmdStripRotateSegment,  //shift a segment of LEDs in the strip in the specified direction by a specific number.
             cmdLedSwap,           //swap the values of two Leds
             cmdLedSetColor,       //sets an led at a selected location to a selected value
             cmdLedGetColor,        //not implemented gets the Led values at a selected location
-            cmdLedFadeIn,           //not implemented
-            cmdLedFadeOut,         //not implemented
+            cmdLedIncColor,           //not implemented
+            cmdLedDecColor,         //not implemented
             cmdLedCopy,         //copy one or more Leds to a new location - number of LEDs to copy, position of 1st LED to copy, position of 1st LED to paste
             cmdLedMove,
+            cmdLedCheck,        //Check if the supplied parameters (color channel values) for a specific LED match.             
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
@@ -151,7 +152,7 @@ namespace LedController
             {
                 deviceComPort = findVirtualComPort();
 
-                if ((deviceComPort != null) && (!isConnected)) //If the port is not null and fgen was not connected, this indicates that we are now establishing a new connection.
+                if ((deviceComPort != null) && (!isConnected)) //If the port is not null and device was not connected, this indicates that we are now establishing a new connection.
                 {
                     try
                     {
@@ -259,11 +260,10 @@ namespace LedController
         }
 
         /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="confirmationTimeoutMs"></param>
-        /// <returns></returns>
-        public bool LedStripOff(UInt16 confirmationTimeoutMs = 50)
+        /// Turns every LED on the strip off.
+        /// </summary>        
+        /// <returns>True if an acknowledgment is received within timeToWaitForResponseMs.</returns>
+        public bool LedStripOff()
         {
             if (!sendPacket(deviceCommands.cmdStripOff)) return false;
             for (int i = 0; i < ledStripState.Length; i++)
@@ -277,31 +277,7 @@ namespace LedController
 
         public bool LedStripRotate(bool rotateClockwise = true, ushort byNumberOfLeds = 1)
         {
-            if (rotateClockwise)
-            {
-                if (!sendPacket(deviceCommands.cmdStripRotateClockwise, byNumberOfLeds)) return false;                
-                for (int numberRotations = 0; numberRotations < byNumberOfLeds; numberRotations++)
-                {
-                    Color temp = ledStripState[0];
-                    for (int i = 0; i < totalLedsOnTheStrip - 1; i++)
-                        ledStripState[i] = ledStripState[i + 1];
-                    ledStripState[totalLedsOnTheStrip - 1] = temp;
-                }
-                return true;
-            }
-            else
-            {
-                if (!sendPacket(deviceCommands.cmdStripRotateCounterClockwise, byNumberOfLeds)) return false;
-                for (int numberRotations = 0; numberRotations < byNumberOfLeds; numberRotations++)
-                {
-                    Color temp = ledStripState[totalLedsOnTheStrip - 1];                    
-                    for (int i = totalLedsOnTheStrip - 1; i > 0; i--)
-                        ledStripState[i] = ledStripState[i - 1];
-                    ledStripState[0] = temp;
-                }
-                return true;
-            }
-            
+            return LedStripRotateSegment(rotateClockwise, 0, totalLedsOnTheStrip, byNumberOfLeds);            
         }
 
         public bool LedSwap(ushort ledId1, ushort ledId2)
@@ -327,12 +303,12 @@ namespace LedController
         /// <param name="numLedsToMove">The number of LEDs to be moved.</param>
         /// <param name="moveFrom"></param>
         /// <param name="moveTo"></param>
-        /// <returns></returns>
+        /// <returns>True if an acknowledgment is received within timeToWaitForResponseMs.</returns>
         public bool LedMove(ushort numLedsToMove, ushort moveFrom, ushort moveTo)
         {
             if (!sendPacket(deviceCommands.cmdLedMove, numLedsToMove, moveFrom, moveTo)) return false;
             Array.Copy(ledStripState, moveFrom, ledStripState, moveTo, numLedsToMove);
-            for (int i = moveFrom; i < (moveFrom + numLedsToMove - 1); i++)
+            for (ushort i = moveFrom; i < (moveFrom + numLedsToMove - 1); i++)
             {
                 ledStripState[i].G = 0;
                 ledStripState[i].R = 0;
@@ -348,7 +324,7 @@ namespace LedController
         /// <param name="greenColor">Green channel value.</param>
         /// <param name="redColor">Red channel value.</param>
         /// <param name="blueColor">Blue channel value.</param>
-        /// <returns></returns>
+        /// <returns>True if an acknowledgment is received within timeToWaitForResponseMs.</returns>
         public bool LedSetColor(ushort ledId, byte greenColor, byte redColor, byte blueColor)
         {
             if (!sendPacket(deviceCommands.cmdLedSetColor, ledId, greenColor, redColor, blueColor)) return false;
@@ -364,17 +340,126 @@ namespace LedController
         /// <param name="greenColor">Green channel value.</param>
         /// <param name="redColor">Red channel value.</param>
         /// <param name="blueColor">Blue channel value.</param>
-        /// <returns></returns>
+        /// <returns>True if an acknowledgment is received within timeToWaitForResponseMs.</returns>
         public bool LedStripSetColor(byte greenColor, byte redColor, byte blueColor)
         {            
             if (!sendPacket(deviceCommands.cmdStripSetColor, greenColor, redColor, blueColor)) return false;
-            for (int i = 0; i < ledStripState.Length; i++)
+            for (ushort i = 0; i < ledStripState.Length; i++)
             {
                 ledStripState[i].G = greenColor;
                 ledStripState[i].R = redColor;
                 ledStripState[i].B = blueColor;
             }
             return true;
+        }
+
+        public bool LedStripDecrementColor(byte incGreenBy, byte incRedBy, byte incBlueBy)
+        {
+            if (!sendPacket(deviceCommands.cmdStripDecColor, incGreenBy, incRedBy, incBlueBy)) return false;
+            for (ushort i = 0; i < ledStripState.Length; i++)
+            {
+                ledStripState[i].G -= incGreenBy;
+                ledStripState[i].R -= incRedBy;
+                ledStripState[i].B -= incBlueBy;
+            }
+            return true;
+        }
+
+        public bool LedStripIncrementColor(byte incGreenBy, byte incRedBy, byte incBlueBy)
+        {
+            if (!sendPacket(deviceCommands.cmdStripIncColor, incGreenBy, incRedBy, incBlueBy)) return false;
+            for (ushort i = 0; i < ledStripState.Length; i++)
+            {
+                ledStripState[i].G += incGreenBy;
+                ledStripState[i].R += incRedBy;
+                ledStripState[i].B += incBlueBy;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Decrements the color for the specified LED by the selected value.
+        /// </summary>
+        /// <param name="ledId">The zero based location of the LED on the stirp.</param>
+        /// <param name="incGreenBy">The current value of Green channel will be decremented by this.</param>
+        /// <param name="incRedBy">The current value of Red channel will be decremented by this.</param>
+        /// <param name="incBlueBy">The current value of Blue channel will be decremented by this.</param>
+        /// <returns>True if an acknowledgment is received within timeToWaitForResponseMs.</returns>
+        public bool LedDecrementColor(ushort ledId, byte incGreenBy, byte incRedBy, byte incBlueBy)
+        {
+            if (!sendPacket(deviceCommands.cmdLedDecColor, ledId, incGreenBy, incRedBy, incBlueBy)) return false;
+            ledStripState[ledId].G -= incGreenBy;
+            ledStripState[ledId].R -= incRedBy;
+            ledStripState[ledId].B -= incBlueBy;
+            return true;
+        }
+
+        /// <summary>
+        /// Increments the color for the specified LED by the selected value.
+        /// </summary>
+        /// <param name="ledId">The zero based location of the LED on the stirp.</param>
+        /// <param name="incGreenBy">The current value of Green channel will be incremented by this.</param>
+        /// <param name="incRedBy">The current value of Red channel will be incremented by this.</param>
+        /// <param name="incBlueBy">The current value of Blue channel will be incremented by this.</param>
+        /// <returns>True if an acknowledgment is received within timeToWaitForResponseMs.</returns>
+        public bool LedIncrementColor(ushort ledId, byte incGreenBy, byte incRedBy, byte incBlueBy)
+        {
+            if (!sendPacket(deviceCommands.cmdLedIncColor, ledId, incGreenBy, incRedBy, incBlueBy)) return false;            
+            ledStripState[ledId].G += incGreenBy;
+            ledStripState[ledId].R += incRedBy;
+            ledStripState[ledId].B += incBlueBy;            
+            return true;
+        }
+
+        /// <summary>
+        /// Tests if the local array ledStripState is in sync with the actual state of the control buffer on the device.
+        /// </summary>
+        /// <returns>True if the state of every LED on the strip matches with the local values.</returns>
+        public bool isInSyncWithDevice()
+        {
+            for (ushort i = 0; i < ledStripState.Length; i++)
+            {
+                if (!LedCheck(i, ledStripState[i].G, ledStripState[i].R, ledStripState[i].B)) return false;
+            }
+            return true;
+        }
+
+        public bool LedStripRotateSegment(bool rotateClockwise, ushort startIndex, ushort endIndex, ushort byNumberOfLeds = 1)
+        {
+            if (rotateClockwise)
+            {
+                if (!sendPacket(deviceCommands.cmdStripRotateSegment, Convert.ToUInt16(rotateClockwise), startIndex, endIndex, byNumberOfLeds)) return false;
+                for (int numberRotations = 0; numberRotations < byNumberOfLeds; numberRotations++)
+                {
+                    Color temp = ledStripState[startIndex];
+                    for (int i = startIndex; i < endIndex - 1; i++)
+                        ledStripState[i] = ledStripState[i + 1];
+                    ledStripState[endIndex - 1] = temp;
+                }
+                return true;
+            }
+            else
+            {
+                if (!sendPacket(deviceCommands.cmdStripRotateSegment, Convert.ToUInt16(rotateClockwise), startIndex, endIndex, byNumberOfLeds)) return false;
+                for (int numberRotations = 0; numberRotations < byNumberOfLeds; numberRotations++)
+                {
+                    Color temp = ledStripState[endIndex - 1];
+                    for (int i = endIndex - 1; i > 0; i--)
+                        ledStripState[i] = ledStripState[i - 1];
+                    ledStripState[startIndex] = temp;
+                }
+                return true;
+            }            
+        }
+
+        /// <summary>
+        /// Checks if the local state of the specified LED matches with state on the device.
+        /// NOTE: if the colors do not match, the device will not send a response.
+        /// </summary>
+        /// <returns>True if the values on the device match with the supplied value.</returns>
+        private bool LedCheck(ushort ledId, byte localGreen, byte localRed, byte localBlue)
+        {
+            return sendPacket(deviceCommands.cmdLedCheck, ledId, localGreen, localRed, localBlue);
         }
 
         private bool LedStripInit()

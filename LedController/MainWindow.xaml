@@ -82,9 +82,12 @@
 			<Button x:Name="btnStreamEffect" Content="Stream Effect" Height="22" Canvas.Left="416" Canvas.Top="10" Width="92" Click="btnRotateLoop_Click"/>
 			<Button x:Name="btnChaseEffect" Content="Chase Effect" Height="22" Canvas.Left="416" Canvas.Top="40" Width="92" Click="btnRotateLoop_Click"/>
 			<xctk:DoubleUpDown x:Name="numRotate" Height="30" Width="59" FormatString="F0" Value="1"  Maximum="1000" Minimum="1" Canvas.Left="85" Text="0" Canvas.Top="126"/>
-			<Button x:Name="btnFadeEffect" Content="Fade Effect" Height="22" Canvas.Left="416" Canvas.Top="71" Width="92" Click="btnRotateLoop_Click" IsEnabled="False"/>
+			<Button x:Name="btnFadeEffect" Content="Fade Effect" Height="22" Canvas.Left="416" Canvas.Top="71" Width="92" Click="btnRotateLoop_Click"/>
 			<Button x:Name="btnRandomOff" Content="Rand Off" Canvas.Left="5" Width="75" Click="btnRandomOff_Click" Canvas.Top="233"/>
 			<Button x:Name="btnDestructEffect" Content="Destruct Effect" Height="22" Canvas.Left="416" Canvas.Top="104" Width="92" Click="btnRotateLoop_Click"/>
+			<Slider x:Name="SliderGreen" Canvas.Left="292" Canvas.Top="10" Height="158" Width="23" Orientation="Vertical" Maximum="255" SmallChange="1" LargeChange="10" TickPlacement="TopLeft" TickFrequency="26" ValueChanged="SliderGreen_ValueChanged"/>
+			<Slider x:Name="sliderRed" Canvas.Left="320" Canvas.Top="10" Height="158" Width="23" Orientation="Vertical" Maximum="255" SmallChange="1" LargeChange="10" TickPlacement="TopLeft" TickFrequency="26" ValueChanged="sliderRed_ValueChanged"/>
+			<Slider x:Name="sliderBlue" Canvas.Left="348" Canvas.Top="10" Height="158" Width="23" Orientation="Vertical" Maximum="255" SmallChange="1" LargeChange="10" TickPlacement="TopLeft" TickFrequency="26" ValueChanged="sliderBlue_ValueChanged"/>
 		</Canvas>
 
 	</Grid>

@@ -57,7 +57,10 @@ namespace LedController
             Random rnd = new Random();
             for (int i = 0; i < rnd.Next(0, 200); i++)
             {
-                ledDevice.LedSetColor((ushort)rnd.Next(0, 300), (byte)rnd.Next(0, 256), (byte)rnd.Next(0, 256), (byte)rnd.Next(0, 256));
+                //ledDevice.LedSetColor((ushort)rnd.Next(0, 300), (byte)rnd.Next(0, 256), (byte)rnd.Next(0, 256), (byte)rnd.Next(0, 256));
+                ledDevice.LedSetColor((ushort)rnd.Next(0, 300), (byte)rnd.Next(0, 100), 0, 0);
+                ledDevice.LedSetColor((ushort)rnd.Next(0, 300), 0, (byte)rnd.Next(0, 100), 0);
+                ledDevice.LedSetColor((ushort)rnd.Next(0, 300), 100, 130, 10);
             }
         }
 
@@ -96,11 +99,11 @@ namespace LedController
             {
                specialEffectsIsRunning.Set();
                if (sender == btnStreamEffect)
-                    (new Thread(streamEffectWorker)).Start();
+                    (new Thread(streamEffectWorker1)).Start();
                if (sender == btnChaseEffect)
                     (new Thread(chasingEffectWorker)).Start();
-               //if (sender == btnFadeEffect)
-                 //   (new Thread(fadeEffectWorker)).Start();
+               if (sender == btnFadeEffect)
+                    (new Thread(fadeEffectWorker)).Start();
                if (sender == btnDestructEffect)
                     (new Thread(destructEffectWorker)).Start();
             }
@@ -120,7 +123,7 @@ namespace LedController
             return curVal;
         }
 
-        private void streamEffectWorker()
+        private void streamEffectWorker1()
         {
             int i = 0;
             int delay = 0;
@@ -190,18 +193,39 @@ namespace LedController
                 }
             }
         }
-
-        /*
+             
         private void fadeEffectWorker()
         {
             Random rnd = new Random();
-            byte[] GRB = new byte[3];
-            rnd.NextBytes(GRB);
+            int nextScroll = rnd.Next(22, 61);
+            int i = 0;
 
             while (specialEffectsIsRunning.WaitOne(0))
-            {                
-                ledDevice.LedStripSetColor(GRB[0], GRB[1], GRB[2]);
-                Thread.Sleep(50);                
+            {/*
+                ledDevice.LedStripRotateSegment(false, 0, 31);
+                ledDevice.LedStripRotateSegment(true, 269, 300);
+                ledDevice.LedStripRotateSegment(false, 150, 269);
+                ledDevice.LedStripRotateSegment(true, 31, 150);
+
+                Thread.Sleep(5);
+                */
+                ledDevice.LedStripRotate(true, 2);
+                Thread.Sleep(1000);
+                ledDevice.LedStripRotate(false, 2);
+                Thread.Sleep(1000);
+
+                i++;
+                if (i == nextScroll)
+                {
+                    int scrollTime = rnd.Next(600, 1400);
+                    bool rotation = Convert.ToBoolean(rnd.Next(0, 2));
+                    for (int b = 0; b < scrollTime; b++)
+                        ledDevice.LedStripRotate(rotation);
+
+                    Thread.Sleep(5);
+                    i = 0;
+                    nextScroll = rnd.Next(22, 61);
+                }
             }
         }
           
@@ -248,7 +272,30 @@ namespace LedController
                 if ((i % rnd.Next(100, 10000)) == 0) { i = 0; delay = 0; }
             }
         }
-        */
+
+        private void sliderRed_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if ((e.NewValue - e.OldValue) > 0)
+                ledDevice.LedStripIncrementColor(0, (byte)(e.NewValue - e.OldValue), 0);
+            else
+                ledDevice.LedStripDecrementColor(0, (byte)(e.OldValue - e.NewValue), 0);
+        }
+
+        private void sliderBlue_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if ((e.NewValue - e.OldValue) > 0)           
+                ledDevice.LedStripIncrementColor(0, 0, (byte)(e.NewValue - e.OldValue));
+            else
+                ledDevice.LedStripDecrementColor(0, 0, (byte)(e.OldValue - e.NewValue));
+        }
+
+        private void SliderGreen_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if ((e.NewValue - e.OldValue) > 0)
+                ledDevice.LedStripIncrementColor((byte)(e.NewValue - e.OldValue), 0, 0);
+            else
+                ledDevice.LedStripDecrementColor((byte)(e.OldValue - e.NewValue), 0, 0);
+        }
     }
 
 }
