@@ -118,7 +118,8 @@ namespace LedController
             cmdLedDecColor,         //not implemented
             cmdLedCopy,         //copy one or more Leds to a new location - number of LEDs to copy, position of 1st LED to copy, position of 1st LED to paste
             cmdLedMove,
-            cmdLedCheck,        //Check if the supplied parameters (color channel values) for a specific LED match.             
+            cmdLedCheck,        //Check if the supplied parameters (color channel values) for a specific LED match.
+            cmdStripSwapSegment,
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
@@ -432,7 +433,7 @@ namespace LedController
                 for (int numberRotations = 0; numberRotations < byNumberOfLeds; numberRotations++)
                 {
                     Color temp = ledStripState[startIndex];
-                    for (int i = startIndex; i < endIndex - 1; i++)
+                    for (int i = startIndex; i < (endIndex - 1); i++)
                         ledStripState[i] = ledStripState[i + 1];
                     ledStripState[endIndex - 1] = temp;
                 }
@@ -444,12 +445,36 @@ namespace LedController
                 for (int numberRotations = 0; numberRotations < byNumberOfLeds; numberRotations++)
                 {
                     Color temp = ledStripState[endIndex - 1];
-                    for (int i = endIndex - 1; i > 0; i--)
+                    for (int i = endIndex - 1; i >= (startIndex + 1); i--)
                         ledStripState[i] = ledStripState[i - 1];
                     ledStripState[startIndex] = temp;
                 }
                 return true;
             }            
+        }
+        
+        public bool LedStripSwapSegment(ushort indexFrom, ushort indexTo, ushort numToSwap, bool mirror = false)
+        {
+            if (!sendPacket(deviceCommands.cmdStripSwapSegment, indexFrom, indexTo, numToSwap, Convert.ToUInt16(mirror))) return false;
+            if (!mirror)
+            {
+                for (ushort i = 0; i < numToSwap; i++)
+                {
+                    Color temp = ledStripState[indexTo + i];
+                    ledStripState[indexTo + i] = ledStripState[indexFrom + i];
+                    ledStripState[indexFrom + i] = temp;
+                }
+            }
+            else
+            {
+                for (ushort i = 0; i < numToSwap; i++)
+                {
+                    Color temp = ledStripState[indexTo + numToSwap - 1 - i];
+                    ledStripState[indexTo + numToSwap - 1 - i] = ledStripState[indexFrom + i];
+                    ledStripState[indexFrom + i] = temp;
+                }
+            }         
+            return true;
         }
 
         /// <summary>
