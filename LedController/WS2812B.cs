@@ -21,7 +21,7 @@ namespace LedController
         private ManualResetEvent KeepRunning = new ManualResetEvent(true);  //used to control running and exiting of comPortWorker Thread.
         private AutoResetEvent responseReceived = new AutoResetEvent(false); //used for waiting for a response.
         private string deviceComPort = null;  //COM1, COM2, COM3 etc...
-        public Color[] ledStripState;  //keeps track of the state of each LED on the stirp
+        private Color[] ledStripState;  //keeps track of the state of each LED on the stirp
 
         public ushort totalLedsOnTheStrip { get; private set; }
 
@@ -128,6 +128,10 @@ namespace LedController
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertName));
         }
 
+        /// <summary>
+        /// Creates an instance of WS2812B. The class will automatically establish and maintain a connection with the device.
+        /// </summary>
+        /// <param name="ledCount">Number of LEDs on the strip.</param>
         public WS2812B(ushort ledCount)
         {
             serialNumber = string.Empty;
@@ -141,7 +145,11 @@ namespace LedController
             ThreadPool.QueueUserWorkItem(comPortWorker);
         }
 
-        public void Disconnect() //destructor
+
+        /// <summary>
+        /// Disconnects from device. This method must be called before exiting the application.
+        /// </summary>
+        public void Disconnect()
         {
             KeepRunning.Reset(); // this will cause the comPortWorker Thread to exit.
             KeepRunning.WaitOne();  //ComPortWorker will signal when all work is done.
@@ -216,7 +224,6 @@ namespace LedController
 
         private void comDataReceived(object sender, SerialDataReceivedEventArgs e)
         {
-            // sp.ReadExisting
             string recvBuffer = string.Empty;
             try
             {
@@ -276,13 +283,34 @@ namespace LedController
             return true;             
         }
 
+        /// <summary>
+        /// Rotates every LED on the strip.
+        /// </summary>
+        /// <param name="rotateClockwise">The direction of rotation. True = clockwise, False = counter-clockwise.</param>
+        /// <param name="byNumberOfLeds">The number of LEDs to rotate by.</param>
+        /// <returns>True if an acknowledgment is received within timeToWaitForResponseMs.</returns>
         public bool LedStripRotate(bool rotateClockwise = true, ushort byNumberOfLeds = 1)
         {
             return LedStripRotateSegment(rotateClockwise, 0, totalLedsOnTheStrip, byNumberOfLeds);            
         }
 
+        /// <summary>
+        /// Swaps two LEDs.
+        /// </summary>
+        /// <param name="ledId1">The zero based index of the first LED to swap.</param>
+        /// <param name="ledId2">The zero based index of the second LED to swap.</param>
+        /// <returns>True if an acknowledgment is received within timeToWaitForResponseMs.</returns>
         public bool LedSwap(ushort ledId1, ushort ledId2)
         {
+            if (ledId1 == ledId2)                
+                throw new InvalidOperationException($"The ledId1 ({ledId1}) must not equal ledId2 ({ledId2}).");
+
+            if (ledId1 > totalLedsOnTheStrip - 1)
+                throw new InvalidOperationException($"ledId1 ({ledId1}) is outside of LED strip ({totalLedsOnTheStrip - 1}).");
+
+            if (ledId2 > totalLedsOnTheStrip - 1)
+                throw new InvalidOperationException($"ledId2 ({ledId2}) is outside of LED strip ({totalLedsOnTheStrip - 1}).");
+
             if (!sendPacket(deviceCommands.cmdLedSwap, ledId1, ledId2)) return false;
             Color temp = ledStripState[ledId1];
             ledStripState[ledId2] = ledStripState[ledId1];
@@ -290,8 +318,27 @@ namespace LedController
             return true;
         }
 
+        /// <summary>
+        /// Copies one or more LEDs starting at copyFrom index to copyTo index..
+        /// </summary>
+        /// <param name="numLedsToCopy">The number of LEDs to copy.</param>
+        /// <param name="copyFrom">The index of the first LED to copy from.</param>
+        /// <param name="copyTo">The index of the first LED to copy to.</param>
+        /// <returns>True if an acknowledgment is received within timeToWaitForResponseMs.</returns>               
         public bool LedCopy(ushort numLedsToCopy, ushort copyFrom, ushort copyTo)
-        {
+        {          
+            if (numLedsToCopy < 1)            
+                throw new InvalidOperationException($"Unable to copy {numLedsToCopy} LEDs.");
+
+            if (copyFrom >= copyTo)
+                throw new InvalidOperationException($"The copyFrom index must be less than copyTo index.");
+
+            if ((copyFrom + numLedsToCopy ) > copyTo)
+                throw new InvalidOperationException("The source overlaps with the destination.");
+
+            if ((copyTo + numLedsToCopy) > totalLedsOnTheStrip)
+                throw new InvalidOperationException("The last element of the destination is outside of the LED strip.");
+
             if (!sendPacket(deviceCommands.cmdLedCopy, numLedsToCopy, copyFrom, copyTo)) return false;
             Array.Copy(ledStripState, copyFrom, ledStripState, copyTo, numLedsToCopy);           
             return true;
@@ -307,6 +354,18 @@ namespace LedController
         /// <returns>True if an acknowledgment is received within timeToWaitForResponseMs.</returns>
         public bool LedMove(ushort numLedsToMove, ushort moveFrom, ushort moveTo)
         {
+            if (numLedsToMove < 1)
+                throw new InvalidOperationException($"Unable to move {numLedsToMove} LEDs.");
+
+            if (moveFrom >= moveTo)
+                throw new InvalidOperationException($"The moveFrom ({moveFrom}) index must be less than moveTo ({moveTo}) index.");
+
+            if ((moveFrom + numLedsToMove) > moveTo)
+                throw new InvalidOperationException("The source overlaps with the destination.");
+
+            if ((moveTo + numLedsToMove) > totalLedsOnTheStrip)
+                throw new InvalidOperationException("The last element of the destination is outside of the LED strip.");
+
             if (!sendPacket(deviceCommands.cmdLedMove, numLedsToMove, moveFrom, moveTo)) return false;
             Array.Copy(ledStripState, moveFrom, ledStripState, moveTo, numLedsToMove);
             for (ushort i = moveFrom; i < (moveFrom + numLedsToMove - 1); i++)
@@ -328,6 +387,9 @@ namespace LedController
         /// <returns>True if an acknowledgment is received within timeToWaitForResponseMs.</returns>
         public bool LedSetColor(ushort ledId, byte greenColor, byte redColor, byte blueColor)
         {
+            if (ledId > totalLedsOnTheStrip - 1)
+                throw new InvalidOperationException($"The index ({ledId}) is outside of the strip ({totalLedsOnTheStrip - 1}).");
+
             if (!sendPacket(deviceCommands.cmdLedSetColor, ledId, greenColor, redColor, blueColor)) return false;
             ledStripState[ledId].G = greenColor;
             ledStripState[ledId].R = redColor;
@@ -425,8 +487,26 @@ namespace LedController
             return true;
         }
 
+
+        /// <summary>
+        /// Rotates a block (segement) of the entire strip.
+        /// </summary>
+        /// <param name="rotateClockwise">Direction to rotate. True = clockwise, False = counter-clockwise.</param>
+        /// <param name="startIndex">The zero based index of the beginning of the segment.</param>
+        /// <param name="endIndex">The zero based index of the end of the segment.</param>
+        /// <param name="byNumberOfLeds">The number of LEDs to rotate by.</param>
+        /// <returns>True if an acknowledgment is received within timeToWaitForResponseMs</returns>
         public bool LedStripRotateSegment(bool rotateClockwise, ushort startIndex, ushort endIndex, ushort byNumberOfLeds = 1)
         {
+            if (byNumberOfLeds < 1)
+                throw new InvalidOperationException($"Unable to rotate by {byNumberOfLeds} LEDs.");
+
+            if(startIndex >= endIndex)
+                throw new InvalidOperationException($"The startIndex ({startIndex}) must be less than endIndex ({endIndex}).");
+
+            if (endIndex >= totalLedsOnTheStrip)
+                throw new InvalidOperationException($"The value of endIndex ({endIndex}) is outside of the LED strip.");
+
             if (rotateClockwise)
             {
                 if (!sendPacket(deviceCommands.cmdStripRotateSegment, Convert.ToUInt16(rotateClockwise), startIndex, endIndex, byNumberOfLeds)) return false;
@@ -452,9 +532,31 @@ namespace LedController
                 return true;
             }            
         }
-        
+
+        /// <summary>
+        /// Swaps a block (segment) of LEDs with the option to mirror.
+        /// </summary>
+        /// <param name="indexFrom">The zero based index of the first source element.</param>
+        /// <param name="indexTo">The zero based index of the first destination element.</param>
+        /// <param name="numToSwap">The number of LEDs to swap.</param>
+        /// <param name="mirror">Only has effect if numToSwap > 1. 
+        ///                      When set to true, the destinaton will be mirrored, that is LED at indexFrom goes 
+        ///                      to indexTo + numToSwap the LED at indexFrom + 1 goes to indexTo + numToSwap - 1 and so on.</param>
+        /// <returns></returns>
         public bool LedStripSwapSegment(ushort indexFrom, ushort indexTo, ushort numToSwap, bool mirror = false)
         {
+            if (numToSwap < 1)
+                throw new InvalidOperationException($"Unable to swap {numToSwap} LED(s).");
+
+            if (indexFrom >= indexTo)
+                throw new InvalidOperationException($"The indexFrom ({indexFrom}) must be less than indexTo ({indexTo}).");
+
+            if ((indexFrom + numToSwap) > indexTo)
+                throw new InvalidOperationException("The source overlaps with the destination.");
+
+            if ((indexTo + numToSwap) > totalLedsOnTheStrip)
+                throw new InvalidOperationException("The last element of the destination is out of the LED strip.");            
+
             if (!sendPacket(deviceCommands.cmdStripSwapSegment, indexFrom, indexTo, numToSwap, Convert.ToUInt16(mirror))) return false;
             if (!mirror)
             {
@@ -475,6 +577,16 @@ namespace LedController
                 }
             }         
             return true;
+        }
+
+        /// <summary>
+        /// Returns the color of the LED at the specified index. NOTE: the returned value is from the buffer on the local machine and not from the buffer on the device.
+        /// </summary>
+        /// <param name="ledID">The zero based index of the LED.</param>
+        /// <returns>The color.</returns>
+        public Color LedGetColor(ushort ledID)
+        {
+            return ledStripState[ledID];
         }
 
         /// <summary>
@@ -504,6 +616,6 @@ namespace LedController
             if (!responseReceived.WaitOne(timeToWaitForResponseMs)) return false;
 
             return true;
-        }
+        }        
     }
 }
